@@ -110,14 +110,14 @@
   <!-- Step 1: uploads -->
   <section class="card">
     <h2><span class="step-num">1</span>Upload your two files</h2>
-    <p class="hint">CSV is recommended. Excel (<code>.xlsx</code>) also works if you're online.</p>
+    <p class="hint">Upload the CSV exports from Doenet and Canvas. If you opened them in Excel, save back to CSV first.</p>
     <div class="uploads">
       <div>
         <div class="drop" id="drop-doenet" tabindex="0" role="button" aria-label="Upload Doenet file">
           <div class="big">📊 Doenet activity export</div>
           <div class="sub">Names &amp; scores from beta.doenet.org</div>
         </div>
-        <input type="file" id="file-doenet" accept=".csv,.xlsx,.xls,text/csv" />
+        <input type="file" id="file-doenet" accept=".csv,text/csv" />
         <div class="err hidden" id="err-doenet" role="alert"></div>
       </div>
       <div>
@@ -125,7 +125,7 @@
           <div class="big">🎓 Canvas gradebook export</div>
           <div class="sub">Downloaded from your Canvas course</div>
         </div>
-        <input type="file" id="file-canvas" accept=".csv,.xlsx,.xls,text/csv" />
+        <input type="file" id="file-canvas" accept=".csv,text/csv" />
         <div class="err hidden" id="err-canvas" role="alert"></div>
       </div>
     </div>
@@ -205,8 +205,6 @@
   </footer>
 </div>
 
-<!-- SheetJS only needed for .xlsx uploads; CSV works fully offline. -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="grade-converter.js"></script>
 <script>
 (function () {
@@ -227,30 +225,12 @@
     });
   }
 
-  // ---- file reading (CSV via core parser, XLSX via SheetJS) -----------------
   function readFile(file) {
     return new Promise(function (resolve, reject) {
-      var name = (file.name || '').toLowerCase();
       var reader = new FileReader();
       reader.onerror = function () { reject(reader.error || new Error('Could not read file')); };
-      if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
-        if (typeof XLSX === 'undefined') {
-          reject(new Error('Excel support needs an internet connection. Please re-export as CSV.'));
-          return;
-        }
-        reader.onload = function () {
-          try {
-            var wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
-            var ws = wb.Sheets[wb.SheetNames[0]];
-            var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
-            resolve(rows.map(function (r) { return r.map(function (c) { return c == null ? '' : String(c); }); }));
-          } catch (e) { reject(e); }
-        };
-        reader.readAsArrayBuffer(file);
-      } else {
-        reader.onload = function () { resolve(GC.parseCSV(reader.result)); };
-        reader.readAsText(file);
-      }
+      reader.onload = function () { resolve(GC.parseCSV(reader.result)); };
+      reader.readAsText(file);
     });
   }
 
