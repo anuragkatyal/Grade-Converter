@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Doenet → Canvas Grade Converter</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --ink: #1f2733; --muted: #6b7686;
+    --line: #e2e6ec; --brand: #2557d6; --brand-ink: #1b3f9e;
+    --green: #1a7f48; --green-bg: #e6f4ec;
+    --amber: #9a6700; --amber-bg: #fdf3da;
+    --gray: #5c6675; --gray-bg: #eef0f3;
+    --blue: #1b5fb3; --blue-bg: #e7f0fb;
+    --radius: 12px; --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.1);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.page h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -.01em; }
+  header.page p { margin: 0; color: var(--muted); }
+  .privacy { margin-top: 10px; font-size: 13px; color: var(--green);
+    background: var(--green-bg); display: inline-block; padding: 5px 10px; border-radius: 999px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px 20px; margin-top: 18px; }
+  .card h2 { margin: 0 0 4px; font-size: 17px; }
+  .card .hint { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%; background: var(--brand); color: #fff;
+    font-size: 13px; font-weight: 700; margin-right: 8px; vertical-align: 1px; }
+
+  .uploads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 700px) { .uploads { grid-template-columns: 1fr; } }
+  .drop { border: 2px dashed var(--line); border-radius: var(--radius); padding: 22px 16px;
+    text-align: center; cursor: pointer; transition: border-color .15s, background .15s; background: #fbfcfd; }
+  .drop:hover, .drop.drag { border-color: var(--brand); background: #f3f7ff; }
+  .drop.loaded { border-style: solid; border-color: var(--green); background: var(--green-bg); }
+  .drop .big { font-weight: 600; }
+  .drop .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .drop .filename { font-weight: 600; color: var(--green); }
+  .drop input[type=file] { display: none; }
+
+  label.fld { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 0 0 4px; }
+  select, input[type=text], input[type=number] {
+    font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+    background: #fff; color: var(--ink); width: 100%; }
+  select:focus, input:focus { outline: 2px solid #bcd0ff; border-color: var(--brand); }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid3, .grid2 { grid-template-columns: 1fr; } }
+
+  .radio-row { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+  .radio-row label { display: flex; align-items: center; gap: 7px; font-weight: 500; cursor: pointer; }
+  .inline-fields { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+  .inline-fields > div { flex: 1 1 180px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .tbl-scroll { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  td select { padding: 5px 7px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .b-high { color: var(--green); background: var(--green-bg); }
+  .b-likely { color: var(--amber); background: var(--amber-bg); }
+  .b-none { color: var(--gray); background: var(--gray-bg); }
+  .b-manual { color: var(--blue); background: var(--blue-bg); }
+  tr.row-likely { background: #fffdf5; }
+  tr.row-none { background: #fafbfc; }
+
+  .summary { display: flex; gap: 22px; flex-wrap: wrap; margin: 4px 0 16px; }
+  .summary .stat { font-size: 13px; color: var(--muted); }
+  .summary .stat b { display: block; font-size: 22px; color: var(--ink); line-height: 1.1; }
+
+  .warn { background: var(--amber-bg); color: var(--amber); border: 1px solid #f0e0b0;
+    border-radius: 10px; padding: 10px 12px; font-size: 13.5px; margin-top: 12px; }
+  details.unmatched { margin-top: 12px; }
+  details.unmatched summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  details.unmatched ul { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: 13.5px; }
+
+  .btn { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 11px 18px;
+    background: var(--brand); color: #fff; cursor: pointer; }
+  .btn:hover { background: var(--brand-ink); }
+  .btn:disabled { background: #b9c4d8; cursor: not-allowed; }
+  .btn.secondary { background: #fff; color: var(--brand); border: 1px solid var(--brand); }
+
+  .hidden { display: none !important; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .err { color: #b42318; background: #fde7e5; border: 1px solid #f6c6c1; border-radius: 8px;
+    padding: 8px 11px; font-size: 13.5px; margin-top: 10px; }
+  code { background: var(--gray-bg); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
+  footer { margin-top: 30px; color: var(--muted); font-size: 12.5px; text-align: center; }
+  a { color: var(--brand); }
+</style>
+</head>
+<body>
+<div id="a11y-status" class="visually-hidden" aria-live="polite"></div>
+<div class="wrap">
+  <header class="page">
+    <h1>Doenet → Canvas Grade Converter</h1>
+    <p>Upload a Doenet activity export and a Canvas gradebook export. Get back a CSV you can import straight into Canvas.</p>
+    <span class="privacy">🔒 Everything runs in your browser — your files never leave this device.</span>
+  </header>
+
+  <!-- Step 1: uploads -->
+  <section class="card">
+    <h2><span class="step-num">1</span>Upload your two files</h2>
+    <p class="hint">CSV is recommended. Excel (<code>.xlsx</code>) also works if you're online.</p>
+    <div class="uploads">
+      <div>
+        <div class="drop" id="drop-doenet" tabindex="0" role="button" aria-label="Upload Doenet file">
+          <div class="big">📊 Doenet activity export</div>
+          <div class="sub">Names &amp; scores from beta.doenet.org</div>
+        </div>
+        <input type="file" id="file-doenet" accept=".csv,.xlsx,.xls,text/csv" />
+        <div class="err hidden" id="err-doenet" role="alert"></div>
+      </div>
+      <div>
+        <div class="drop" id="drop-canvas" tabindex="0" role="button" aria-label="Upload Canvas file">
+          <div class="big">🎓 Canvas gradebook export</div>
+          <div class="sub">Downloaded from your Canvas course</div>
+        </div>
+        <input type="file" id="file-canvas" accept=".csv,.xlsx,.xls,text/csv" />
+        <div class="err hidden" id="err-canvas" role="alert"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 2: column mapping -->
+  <section class="card hidden" id="card-map">
+    <h2><span class="step-num">2</span>Confirm the Doenet columns</h2>
+    <p class="hint">Auto-detected from your file — adjust if anything looks wrong.</p>
+    <div class="grid3">
+      <div><label class="fld" for="map-first">First name column</label><select id="map-first"></select></div>
+      <div><label class="fld" for="map-last">Last name column</label><select id="map-last"></select></div>
+      <div><label class="fld" for="map-score">Score column</label><select id="map-score"></select></div>
+    </div>
+  </section>
+
+  <!-- Step 3: target + scaling -->
+  <section class="card hidden" id="card-target">
+    <h2><span class="step-num">3</span>Choose the Canvas column &amp; grade handling</h2>
+
+    <p class="hint" style="margin-bottom:8px"><strong>Which Canvas column should receive the grades?</strong></p>
+    <div class="radio-row">
+      <label><input type="radio" name="target-mode" value="new" checked /> Create a new assignment</label>
+      <label><input type="radio" name="target-mode" value="existing" /> Fill an existing assignment</label>
+    </div>
+    <div class="inline-fields" id="target-new">
+      <div><label class="fld" for="new-name">New assignment name</label><input type="text" id="new-name" /></div>
+      <div><label class="fld" for="new-points">Points possible</label><input type="number" id="new-points" value="100" min="0" step="any" /></div>
+    </div>
+    <div class="inline-fields hidden" id="target-existing">
+      <div><label class="fld" for="existing-sel">Existing assignment</label><select id="existing-sel"></select></div>
+      <div><label class="fld" for="existing-points">Points possible</label><input type="text" id="existing-points" readonly /></div>
+    </div>
+
+    <p class="hint" style="margin:18px 0 8px"><strong>How should the Doenet score map into that column?</strong></p>
+    <div class="radio-row">
+      <label><input type="radio" name="scale-mode" value="percent" checked /> Doenet value is a percent → scale to points possible</label>
+      <label><input type="radio" name="scale-mode" value="copy" /> Copy the number as-is</label>
+    </div>
+  </section>
+
+  <!-- Step 4: match review -->
+  <section class="card hidden" id="card-match">
+    <h2><span class="step-num">4</span>Review student matches</h2>
+    <p class="hint">Auto-matched by name. Yellow rows are best-guess matches — please confirm. Change any dropdown to fix a match.</p>
+    <div class="summary" id="summary"></div>
+    <div class="warn hidden" id="collision-warn"></div>
+    <div class="tbl-scroll">
+      <table id="match-table">
+        <thead><tr>
+          <th>Doenet student</th><th class="num">Score</th><th>→ Canvas student</th>
+          <th class="num">Grade in Canvas</th><th>Status</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <details class="unmatched" id="unmatched-doenet"></details>
+  </section>
+
+  <!-- Step 5: download -->
+  <section class="card hidden" id="card-download">
+    <h2><span class="step-num">5</span>Download your Canvas import file</h2>
+    <p class="hint">Preview of the file (first rows). Blank grades mean "leave unchanged" in Canvas.</p>
+    <div class="tbl-scroll" style="max-height:300px"><table id="preview-table"></table></div>
+    <div style="margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap">
+      <button class="btn" id="download-btn" disabled>⬇ Download Canvas import CSV</button>
+      <span class="hint" id="download-name" style="margin:0"></span>
+    </div>
+    <div class="warn" style="margin-top:14px">
+      <strong>Next:</strong> In Canvas, open the Gradebook → <em>Import</em> (or the assignment's gear → <em>Re-Upload Scores</em>),
+      choose this file, and review the preview before saving. Canvas matches students by the hidden <code>ID</code> column.
+    </div>
+  </section>
+
+  <footer>
+    Runs entirely client-side · <a href="https://github.com/anuragkatyal/Grade-Converter">source on GitHub</a>
+  </footer>
+</div>
+
+<!-- SheetJS only needed for .xlsx uploads; CSV works fully offline. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="grade-converter.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  var state = {
+    doenet: null,   // { detect, mapping, students: [{display, tokens, score}] }
+    canvas: null,   // { detect, students: [parseCanvasStudent] }
+    assign: [],     // per doenet student -> canvas data-row index or null
+    confidence: [], // per doenet student -> 'high'|'likely'|'none'|'manual'
+    lastOutput: null,
+  };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ---- file reading (CSV via core parser, XLSX via SheetJS) -----------------
+  function readFile(file) {
+    return new Promise(function (resolve, reject) {
+      var name = (file.name || '').toLowerCase();
+      var reader = new FileReader();
+      reader.onerror = function () { reject(reader.error || new Error('Could not read file')); };
+      if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+        if (typeof XLSX === 'undefined') {
+          reject(new Error('Excel support needs an internet connection. Please re-export as CSV.'));
+          return;
+        }
+        reader.onload = function () {
+          try {
+            var wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+            resolve(rows.map(function (r) { return r.map(function (c) { return c == null ? '' : String(c); }); }));
+          } catch (e) { reject(e); }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        reader.onload = function () { resolve(GC.parseCSV(reader.result)); };
+        reader.readAsText(file);
+      }
+    });
+  }
+
+  // ---- drop-zone wiring -----------------------------------------------------
+  function wireDrop(dropId, inputId, onFile) {
+    var drop = $(dropId), input = $(inputId);
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', function () { if (input.files[0]) onFile(input.files[0]); });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('drag'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('drag'); });
+    });
+    drop.addEventListener('drop', function (e) {
+      if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  function showErr(id, msg) { var el = $(id); el.textContent = msg; el.classList.remove('hidden'); }
+  function hideErr(id) { $(id).classList.add('hidden'); }
+  function markLoaded(dropId, filename, count, noun) {
+    var drop = $(dropId);
+    drop.classList.add('loaded');
+    drop.innerHTML = '<div class="big">✓ <span class="filename">' + esc(filename) + '</span></div>' +
+      '<div class="sub">' + count + ' ' + noun + ' loaded — click to replace</div>';
+    // Keep the accessible name in sync with the new state, and announce it.
+    drop.setAttribute('aria-label', filename + ' loaded: ' + count + ' ' + noun + '. Activate to replace.');
+    $('a11y-status').textContent = filename + ': ' + count + ' ' + noun + ' loaded.';
+  }
+
+  // ---- handle Doenet upload -------------------------------------------------
+  function onDoenet(file) {
+    hideErr('err-doenet');
+    readFile(file).then(function (rows) {
+      var d = GC.detectDoenet(rows);
+      // Count rows that actually yield a usable name — a Canvas file dropped here
+      // can have a numeric column but produces zero named students.
+      var named = d.data.filter(function (r) {
+        if (GC.isBlankRow(r)) return false;
+        var nm = GC.doenetName(d.firstIdx >= 0 ? r[d.firstIdx] : '', d.lastIdx >= 0 ? r[d.lastIdx] : '');
+        return nm.display || nm.tokens.length;
+      });
+      if (!rows.length || d.scoreIdx < 0 || named.length === 0) {
+        showErr('err-doenet', "No student names + scores found. Is this a Doenet activity export? (A Canvas gradebook file goes in the other box.)");
+        return;
+      }
+      state.doenet = { detect: d };
+      markLoaded('drop-doenet', file.name, named.length, 'students');
+      buildMappingUI();
+      maybeReady();
+    }).catch(function (e) { showErr('err-doenet', e.message || 'Could not read this file.'); });
+  }
+
+  // ---- handle Canvas upload -------------------------------------------------
+  function onCanvas(file) {
+    hideErr('err-canvas');
+    readFile(file).then(function (rows) {
+      var c = GC.detectCanvas(rows);
+      if (!rows.length || c.idIdx < 0) {
+        showErr('err-canvas', "Couldn't find the 'ID' column. Please upload a Canvas gradebook export (Grades → Export).");
+        return;
+      }
+      state.canvas = { detect: c, students: c.data.map(function (r) { return GC.parseCanvasStudent(r[c.studentIdx]); }) };
+      markLoaded('drop-canvas', file.name, c.data.filter(function (r) { return !GC.isBlankRow(r); }).length, 'students');
+      buildTargetUI();
+      maybeReady();
+    }).catch(function (e) { showErr('err-canvas', e.message || 'Could not read this file.'); });
+  }
+
+  // ---- Step 2: column mapping selects --------------------------------------
+  function optionList(headers, selected) {
+    return headers.map(function (h, i) {
+      return '<option value="' + i + '"' + (i === selected ? ' selected' : '') + '>' + esc(h || ('Column ' + (i + 1))) + '</option>';
+    }).join('');
+  }
+  function buildMappingUI() {
+    var d = state.doenet.detect, h = d.headers;
+    $('map-first').innerHTML = '<option value="-1">— none —</option>' + optionList(h, d.firstIdx);
+    $('map-last').innerHTML = '<option value="-1">— none —</option>' + optionList(h, d.lastIdx);
+    $('map-score').innerHTML = optionList(h, d.scoreIdx);
+    ['map-first', 'map-last', 'map-score'].forEach(function (id) {
+      $(id).onchange = function () { rebuildDoenetStudents(); runAutoMatch(); recompute(); };
+    });
+    rebuildDoenetStudents();
+    $('card-map').classList.remove('hidden');
+  }
+
+  function rebuildDoenetStudents() {
+    var d = state.doenet.detect;
+    var fi = parseInt($('map-first').value, 10);
+    var li = parseInt($('map-last').value, 10);
+    var si = parseInt($('map-score').value, 10);
+    state.doenet.mapping = { firstIdx: fi, lastIdx: li, scoreIdx: si };
+    state.doenet.students = d.data
+      .filter(function (r) { return !GC.isBlankRow(r); })
+      .map(function (r) {
+        var nm = GC.doenetName(fi >= 0 ? r[fi] : '', li >= 0 ? r[li] : '');
+        return { display: nm.display, tokens: nm.tokens, score: si >= 0 ? r[si] : '' };
+      })
+      .filter(function (s) { return s.display || s.tokens.length; });
+  }
+
+  // ---- Step 3: target + scaling UI -----------------------------------------
+  function buildTargetUI() {
+    var c = state.canvas.detect;
+    $('new-name').value = (state.doenet && state.doenet.detect.scoreHeader) || 'Doenet Activity';
+    $('existing-sel').innerHTML = c.assignments.map(function (a, i) {
+      return '<option value="' + i + '">' + esc(a.header) + '</option>';
+    }).join('');
+    syncExistingPoints();
+
+    // If the Canvas export has no assignment columns to fill, force "new".
+    var existingRadio = document.querySelector('input[name=target-mode][value=existing]');
+    if (!c.assignments.length) {
+      existingRadio.disabled = true;
+      existingRadio.parentNode.title = 'This Canvas file has no assignment columns to fill.';
+      var newRadio = document.querySelector('input[name=target-mode][value=new]');
+      newRadio.checked = true;
+      $('target-existing').classList.add('hidden');
+      $('target-new').classList.remove('hidden');
+    } else {
+      existingRadio.disabled = false;
+    }
+
+    document.querySelectorAll('input[name=target-mode]').forEach(function (el) {
+      el.onchange = function () {
+        var ex = el.value === 'existing';
+        $('target-existing').classList.toggle('hidden', !ex);
+        $('target-new').classList.toggle('hidden', ex);
+        recompute();
+      };
+    });
+    $('existing-sel').onchange = function () { syncExistingPoints(); recompute(); };
+    // The assignment name affects only the output header/preview, not the match
+    // table — avoid rebuilding the whole table (and all dropdowns) on each keystroke.
+    $('new-name').oninput = recomputeOutputOnly;
+    $('new-points').oninput = recompute;
+    document.querySelectorAll('input[name=scale-mode]').forEach(function (el) { el.onchange = recompute; });
+    $('card-target').classList.remove('hidden');
+  }
+  function syncExistingPoints() {
+    var c = state.canvas.detect;
+    var a = c.assignments[parseInt($('existing-sel').value, 10)];
+    $('existing-points').value = a ? a.pointsPossible : '';
+  }
+
+  // ---- when both files ready: auto-match -----------------------------------
+  function maybeReady() {
+    if (!state.doenet || !state.canvas) return;
+    if (!state.doenet.students) rebuildDoenetStudents();
+    runAutoMatch();
+    $('card-match').classList.remove('hidden');
+    $('card-download').classList.remove('hidden');
+    recompute();
+  }
+
+  function runAutoMatch() {
+    if (!state.doenet || !state.canvas || !state.doenet.students) return;
+    var m = GC.autoMatch(state.doenet.students, state.canvas.students);
+    state.assign = m.map(function (x) { return x.canvasIdx; });
+    state.confidence = m.map(function (x) { return x.confidence; });
+  }
+
+  // ---- target/scale resolution ---------------------------------------------
+  function currentMode() { return document.querySelector('input[name=target-mode]:checked').value; }
+  function currentTarget() {
+    var c = state.canvas.detect;
+    var mode = currentMode();
+    if (mode === 'existing') {
+      var a = c.assignments[parseInt($('existing-sel').value, 10)] || {};
+      return { header: a.header || '', points: a.pointsPossible || '' };
+    }
+    return { header: $('new-name').value.trim() || 'Doenet Activity', points: $('new-points').value || '0' };
+  }
+  function currentScaleMode() { return document.querySelector('input[name=scale-mode]:checked').value; }
+
+  // ---- recompute everything -------------------------------------------------
+  // Computes the grade view ONCE, then renders the table + summary/preview from it.
+  function recompute() {
+    if (!state.doenet || !state.doenet.students || !state.canvas) return;
+    var target = currentTarget(), scaleMode = currentScaleMode();
+    var gm = buildGradesMap(target, scaleMode);
+    renderMatchTable(target, scaleMode, gm);
+    renderSummaryAndPreview(target, scaleMode, gm);
+  }
+
+  // Cheap path for inputs that only affect the output (assignment name) and not
+  // the match table.
+  function recomputeOutputOnly() {
+    if (!state.doenet || !state.doenet.students || !state.canvas) return;
+    var target = currentTarget(), scaleMode = currentScaleMode();
+    renderSummaryAndPreview(target, scaleMode, buildGradesMap(target, scaleMode));
+  }
+
+  function renderMatchTable(target, scaleMode, gm) {
+    var ds = state.doenet.students, cs = state.canvas.students;
+    var canvasOpts = cs.map(function (s, idx) {
+      return s.raw ? { idx: idx, label: s.raw } : null;
+    }).filter(Boolean);
+
+    // Preserve which row's dropdown had focus across the innerHTML rebuild.
+    var active = document.activeElement;
+    var focusedI = active && active.classList && active.classList.contains('match-sel')
+      ? active.getAttribute('data-i') : null;
+
+    var tbody = $('match-table').querySelector('tbody');
+    var html = '';
+    ds.forEach(function (s, i) {
+      var assigned = state.assign[i];
+      var conf = state.confidence[i] || 'none';
+      var overwritten = assigned != null && gm.winners[assigned] !== i;
+      var rowCls = overwritten ? 'row-none' : (conf === 'likely' ? 'row-likely' : (assigned == null ? 'row-none' : ''));
+      var grade = assigned == null ? '' : (overwritten ? '(overwritten)' : GC.transformScore(s.score, scaleMode, target.points));
+      var opts = '<option value="-1">— No match (skip) —</option>' + canvasOpts.map(function (o) {
+        return '<option value="' + o.idx + '"' + (o.idx === assigned ? ' selected' : '') + '>' + esc(o.label) + '</option>';
+      }).join('');
+      var name = esc(s.display || '(no name)');
+      html += '<tr class="' + rowCls + '">' +
+        '<td>' + name + '</td>' +
+        '<td class="num">' + esc(s.score) + '</td>' +
+        '<td><select data-i="' + i + '" class="match-sel" aria-label="Canvas match for ' + name + '">' + opts + '</select></td>' +
+        '<td class="num">' + esc(grade) + '</td>' +
+        '<td>' + badge(conf, assigned, overwritten) + '</td>' +
+        '</tr>';
+    });
+    tbody.innerHTML = html;
+    tbody.querySelectorAll('select.match-sel').forEach(function (sel) {
+      sel.onchange = function () {
+        var i = parseInt(sel.getAttribute('data-i'), 10);
+        var v = parseInt(sel.value, 10);
+        state.assign[i] = v < 0 ? null : v;
+        state.confidence[i] = v < 0 ? 'none' : 'manual';
+        recompute();
+      };
+    });
+    if (focusedI != null) {
+      var restore = tbody.querySelector('select.match-sel[data-i="' + focusedI + '"]');
+      if (restore) restore.focus();
+    }
+  }
+
+  function badge(conf, assigned, overwritten) {
+    if (assigned == null) return '<span class="badge b-none">Unmatched</span>';
+    if (overwritten) return '<span class="badge b-none">Overwritten</span>';
+    if (conf === 'manual') return '<span class="badge b-manual">Manual</span>';
+    if (conf === 'likely') return '<span class="badge b-likely">Confirm?</span>';
+    return '<span class="badge b-high">Matched</span>';
+  }
+
+  // First Doenet writer for a given Canvas student wins (deterministic); later
+  // duplicates are reported as collisions rather than silently overwriting.
+  function buildGradesMap(target, scaleMode) {
+    var grades = new Map(), winners = {}, seen = {}, collisions = [], unparsed = [];
+    var ppNum = parseFloat(target.points);
+    var ppValid = scaleMode !== 'percent' || ppNum > 0;
+    state.doenet.students.forEach(function (s, i) {
+      var ci = state.assign[i];
+      if (ci == null) return;
+      if (seen[ci] != null) {
+        collisions.push({
+          canvas: state.canvas.students[ci].raw,
+          a: state.doenet.students[seen[ci]].display || '(no name)',
+          b: s.display || '(no name)',
+        });
+        return; // keep the first writer's grade
+      }
+      seen[ci] = i; winners[ci] = i;
+      var g = GC.transformScore(s.score, scaleMode, target.points);
+      if (g === '' && String(s.score).trim() !== '' && ppValid) unparsed.push(s.display || '(no name)');
+      grades.set(ci, g);
+    });
+    return { grades: grades, winners: winners, collisions: collisions, unparsed: unparsed };
+  }
+
+  function renderSummaryAndPreview(target, scaleMode, gm) {
+    var ds = state.doenet.students, cs = state.canvas.students;
+    var matched = state.assign.filter(function (x) { return x != null; }).length;
+    var likely = state.confidence.filter(function (x) { return x === 'likely'; }).length;
+    var canvasTotal = cs.filter(function (s) { return s.raw; }).length;
+    var gradeCount = Array.from(gm.grades.values()).filter(function (g) { return g !== ''; }).length;
+
+    $('summary').innerHTML =
+      stat(matched + ' / ' + ds.length, 'Doenet students matched') +
+      stat(String(gradeCount), 'Canvas students will get a grade') +
+      stat(String(Math.max(0, canvasTotal - gradeCount)), 'Canvas students left unchanged') +
+      (likely ? stat(String(likely), 'best-guess — please confirm') : '');
+
+    // Build the warning list; some warnings block the download.
+    var warns = [], blocking = false;
+    var ppNum = parseFloat(target.points);
+    if (gm.collisions.length) {
+      warns.push('⚠ ' + gm.collisions.map(function (c) {
+        return esc(c.a) + ' and ' + esc(c.b) + ' both map to “' + esc(c.canvas) + '”';
+      }).join('; ') + '. The first one’s grade is used — fix a dropdown so each Doenet student maps to a different Canvas student.');
+    }
+    if ((currentMode() === 'new' || scaleMode === 'percent') && !(ppNum > 0)) {
+      warns.push('⛔ Enter a “Points possible” greater than 0' +
+        (scaleMode === 'percent' ? ' — otherwise every percentage scales to 0.' : ' for the new assignment.') +
+        (currentMode() === 'existing' ? ' (This Canvas assignment has no points set; set it in Canvas or switch to “Copy the number as-is”.)' : ''));
+      blocking = true;
+    }
+    if (!String(target.header).trim()) {
+      warns.push('⛔ No Canvas assignment selected to receive the grades.');
+      blocking = true;
+    }
+    if (gm.unparsed.length) {
+      warns.push('⚠ Couldn’t read a number for: ' + gm.unparsed.map(esc).join(', ') +
+        '. Those grades are left blank — re-export from Doenet with plain numbers (e.g. 87.5, not 87,5).');
+    }
+    var cw = $('collision-warn');
+    if (warns.length) { cw.classList.remove('hidden'); cw.innerHTML = warns.join('<br>'); }
+    else { cw.classList.add('hidden'); }
+
+    // Doenet students with no Canvas match.
+    var noMatch = ds.filter(function (_, i) { return state.assign[i] == null; }).map(function (s) { return s.display || '(no name)'; });
+    var det = $('unmatched-doenet');
+    if (noMatch.length) {
+      det.innerHTML = '<summary>' + noMatch.length + ' Doenet student(s) not transferred</summary><ul>' +
+        noMatch.map(function (n) { return '<li>' + esc(n) + '</li>'; }).join('') + '</ul>';
+      det.classList.remove('hidden');
+    } else { det.classList.add('hidden'); }
+
+    var btn = $('download-btn');
+    if (blocking) {
+      btn.disabled = true; btn.onclick = null;
+      $('download-name').textContent = '';
+      $('preview-table').innerHTML = '<tr><td style="color:var(--muted)">Resolve the items above to generate the file.</td></tr>';
+      return;
+    }
+
+    // Output preview + download.
+    var outRows = GC.buildCanvasImport({
+      canvas: state.canvas.detect, targetHeader: target.header,
+      targetPointsPossible: target.points, grades: gm.grades, isNew: currentMode() === 'new',
+    });
+    state.lastOutput = outRows;
+    renderPreview(outRows);
+
+    var fname = downloadName(target.header);
+    $('download-name').textContent = fname;
+    btn.disabled = false;
+    btn.onclick = function () { downloadCSV(GC.toCSV(outRows), fname); };
+  }
+
+  function stat(big, label) { return '<div class="stat"><b>' + esc(big) + '</b>' + esc(label) + '</div>'; }
+
+  function renderPreview(rows) {
+    var max = Math.min(rows.length, 12);
+    var html = '';
+    for (var r = 0; r < max; r++) {
+      var tag = r === 0 ? 'th' : 'td';
+      html += '<tr>' + rows[r].map(function (c, ci) {
+        var cls = (r > 1 && ci === rows[r].length - 1) ? ' class="num"' : '';
+        return '<' + tag + cls + '>' + esc(c) + '</' + tag + '>';
+      }).join('') + '</tr>';
+    }
+    if (rows.length > max) {
+      html += '<tr><td colspan="' + rows[0].length + '" style="color:var(--muted)">… ' + (rows.length - max) + ' more rows</td></tr>';
+    }
+    $('preview-table').innerHTML = html;
+  }
+
+  function downloadName(header) {
+    var safe = String(header || 'grades').replace(/[^a-z0-9 _-]/gi, '').trim() || 'grades';
+    var d = new Date().toISOString().slice(0, 10);
+    return 'Canvas Import - ' + safe + ' - ' + d + '.csv';
+  }
+  function downloadCSV(text, filename) {
+    var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  // ---- init -----------------------------------------------------------------
+  wireDrop('drop-doenet', 'file-doenet', onDoenet);
+  wireDrop('drop-canvas', 'file-canvas', onCanvas);
+})();
+</script>
+</body>
+</html>

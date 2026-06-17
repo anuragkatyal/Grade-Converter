@@ -1,0 +1,19 @@
+{
+  "name": "grade-converter",
+  "version": "1.0.0",
+  "description": "Client-side tool to transfer Doenet activity grades into a Canvas-importable CSV",
+  "main": "grade-converter.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node test/grade-converter.test.mjs && node test/ui.integration.test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anuragkatyal/Grade-Converter.git"
+  },
+  "license": "MIT",
+  "private": true
+}
