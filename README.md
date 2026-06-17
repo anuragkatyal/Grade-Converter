@@ -16,8 +16,8 @@ matching happens in your browser, so student data never leaves your machine.
 
 ## What it does
 
-1. **Upload** a Doenet activity export and a Canvas gradebook export (`.csv`, or
-   `.xlsx` when you're online).
+1. **Upload** a Doenet activity export and a Canvas gradebook export, both as
+   `.csv` (if you opened them in Excel, save back to CSV first).
 2. **Confirm columns** — the tool auto-detects the Doenet name and score columns;
    you can override them.
 3. **Pick the Canvas target** — create a brand-new assignment column, or fill an
@@ -90,8 +90,8 @@ This repo is plain static files — no build step.
 4. After a minute the tool is live at
    `https://anuragkatyal.github.io/Grade-Converter/`.
 
-The only external dependency is [SheetJS](https://sheetjs.com) (loaded from a CDN)
-and it is used **only** to read `.xlsx` uploads — CSV uploads work fully offline.
+There are **no external dependencies** — no CDN scripts and no build step — so
+the tool works fully offline once the page has loaded.
 
 ---
 
