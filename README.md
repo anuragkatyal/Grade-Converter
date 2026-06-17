@@ -1,5 +1,7 @@
 # Grade-Converter
 
+[![CI](https://github.com/anuragkatyal/Grade-Converter/actions/workflows/ci.yml/badge.svg)](https://github.com/anuragkatyal/Grade-Converter/actions/workflows/ci.yml)
+
 A small, **100% client-side** web tool that transfers grades from a
 [Doenet](https://beta.doenet.org) activity export into a CSV you can import
 directly into the **Canvas** gradebook.
