@@ -26,6 +26,7 @@ function eq(name, actual, expected) {
 
 const doenetText = readFileSync(join(root, 'From Doenet.csv'), 'utf8');
 const canvasText = readFileSync(join(root, 'From Canvas.csv'), 'utf8');
+const d2lText = readFileSync(join(root, 'From D2L.csv'), 'utf8');
 
 // ---------------------------------------------------------------------------
 console.log('\nCSV parsing');
@@ -213,6 +214,83 @@ console.log('\nWrong-file detection basis');
   });
   ok('a Canvas file yields 0 named Doenet students (so it is rejected)', named.length === 0, String(named.length));
   ok('a Doenet file has no Canvas ID column (so it is rejected)', GC.detectCanvas(GC.parseCSV(doenetText)).idIdx === -1);
+}
+
+// ---------------------------------------------------------------------------
+console.log('\nD2L detection');
+const d2lRows = GC.parseCSV(d2lText);
+const d2 = GC.detectD2L(d2lRows);
+eq('no Points Possible row -> data starts at first student', d2.data.length, 9);
+eq('identifier columns OrgDefinedId,Username,Last Name,First Name', d2.idCols, [0, 1, 2, 3]);
+eq('org/user/first/last indices', [d2.orgIdx, d2.userIdx, d2.firstIdx, d2.lastIdx], [0, 1, 3, 2]);
+eq('one grade item detected', d2.gradeItems.length, 1);
+eq('grade item name strips " Points Grade" suffix',
+  d2.gradeItems[0], { index: 4, name: 'Sample Activity 1', header: 'Sample Activity 1 Points Grade' });
+eq('End-of-Line Indicator column located', d2.eolIdx, 5);
+
+// ---------------------------------------------------------------------------
+console.log('\nD2L per-student parsing + matching');
+const d2lStudents = d2.data.filter((r) => !GC.isBlankRow(r)).map((r) => GC.parseD2LStudent(r[d2.firstIdx], r[d2.lastIdx]));
+eq('separate first/last joined into raw', d2lStudents[0].raw, 'Alice Apple');
+eq('multi-token name tokenised', d2lStudents[6].tokens, ['maria', 'elena', 'garcia', 'lopez']);
+{
+  const m = GC.autoMatch(doenetStudents, d2lStudents);
+  const idxOf = (name) => doenetStudents.findIndex((d) => d.display.toLowerCase() === name.toLowerCase());
+  ok('Alice Apple -> high', m[idxOf('Alice Apple')].confidence === 'high');
+  ok('erin evans -> high (case-insensitive)', m[idxOf('erin evans')].confidence === 'high');
+  const ml = m[idxOf('Maria Lopez')];
+  ok('Maria Lopez -> Garcia Lopez (likely)',
+    ml.canvasIdx != null && d2lStudents[ml.canvasIdx].raw === 'Maria Elena Garcia Lopez' && ml.confidence === 'likely',
+    JSON.stringify(ml));
+  ok('Nina Okafor stays unmatched (no D2L counterpart)', m[idxOf('Nina Okafor')].canvasIdx === null);
+}
+
+// ---------------------------------------------------------------------------
+console.log('\nD2L import build (new item, percent -> 100 pts)');
+{
+  const m = GC.autoMatch(doenetStudents, d2lStudents);
+  const grades = new Map();
+  const doenetData = dd.data.filter((x) => !GC.isBlankRow(x));
+  d2.data.forEach((r, ri) => {
+    const di = m.findIndex((x) => x.canvasIdx === ri);
+    if (di >= 0) grades.set(ri, GC.transformScore(doenetData[di][dd.scoreIdx], 'percent', 100));
+  });
+  const out = GC.buildD2LImport({ d2l: d2, targetName: 'Sample Activity 1', grades, isNew: true });
+
+  eq('header preserves identifier cols + "<name> Points Grade" + End-of-Line',
+    out[0], ['OrgDefinedId', 'Username', 'Last Name', 'First Name', 'Sample Activity 1 Points Grade', 'End-of-Line Indicator']);
+  ok('no Points Possible row (first data row is a student)', out[1][0] === '3000001');
+  ok('every data row ends with the "#" End-of-Line marker',
+    out.slice(1).every((r) => r[r.length - 1] === '#'));
+  ok('identifier values (incl. #-prefixed username) copied verbatim',
+    out[1][0] === '3000001' && out[1][1] === '#aapple');
+
+  function d2lGrade(org) {
+    const row = out.find((r) => r[0] === org);
+    return row ? row[row.length - 2] : undefined; // last col is End-of-Line "#"
+  }
+  eq('Alice Apple (3000001) -> 100', d2lGrade('3000001'), '100');
+  eq('Maria (fuzzy, 3000007) -> 100', d2lGrade('3000007'), '100');
+  eq('unmatched Test Student (3000009) -> blank', d2lGrade('3000009'), '');
+
+  // New vs existing both use the "<name> Points Grade" header form.
+  const outExisting = GC.buildD2LImport({ d2l: d2, targetName: 'Sample Activity 1', grades: new Map(), isNew: false });
+  eq('existing item header form', outExisting[0][4], 'Sample Activity 1 Points Grade');
+
+  // Round-trip survives serialise/parse.
+  const reparsed = GC.parseCSV(GC.toCSV(out));
+  eq('round-trip preserves header', reparsed[0], out[0]);
+  ok('round-trip keeps End-of-Line "#"', reparsed.slice(1).every((r) => r[r.length - 1] === '#'));
+}
+
+// ---------------------------------------------------------------------------
+console.log('\nWrong-file detection (D2L)');
+{
+  ok('a Canvas file is not a valid D2L export (no First/Last Name cols)',
+    GC.detectD2L(GC.parseCSV(canvasText)).firstIdx === -1);
+  const d2chk = GC.detectD2L(d2lRows);
+  ok('a real D2L file has an identifier + name columns',
+    (d2chk.orgIdx >= 0 || d2chk.userIdx >= 0) && d2chk.firstIdx >= 0 && d2chk.lastIdx >= 0);
 }
 
 // ---------------------------------------------------------------------------
