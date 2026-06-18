@@ -219,6 +219,59 @@
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // D2L / Brightspace detection
+  // ---------------------------------------------------------------------------
+  // A D2L grade export has a single header row (NO "Points Possible" row),
+  // identifier columns (OrgDefinedId / Username / Last Name / First Name / Email)
+  // and one column per grade item named "<Item Name> Points Grade", plus a final
+  // "End-of-Line Indicator" column. D2L re-matches students on import by the
+  // OrgDefinedId / Username identifier columns (never by name), so those are
+  // preserved verbatim on output.
+  function detectD2L(rows) {
+    if (!rows.length) return { headers: [], data: [], idCols: [], gradeItems: [], orgIdx: -1, userIdx: -1, firstIdx: -1, lastIdx: -1, emailIdx: -1, eolIdx: -1 };
+    const headers = rows[0].map(function (h) { return String(h).trim(); });
+    const data = rows.slice(1); // no Points Possible row to skip
+    const lower = headers.map(function (h) { return h.toLowerCase().replace(/\s+/g, ' ').trim(); });
+
+    const find = function (cands) { return lower.findIndex(function (h) { return cands.indexOf(h) >= 0; }); };
+    const orgIdx = find(['orgdefinedid', 'org defined id']);
+    const userIdx = find(['username', 'user name']);
+    const lastIdx = find(['last name', 'lastname']);
+    const firstIdx = find(['first name', 'firstname']);
+    const emailIdx = find(['email', 'email address']);
+    const eolIdx = lower.indexOf('end-of-line indicator');
+
+    // Identifier/label columns to preserve verbatim on output, in original order.
+    const idCols = [];
+    [orgIdx, userIdx, lastIdx, firstIdx, emailIdx].forEach(function (j) {
+      if (j >= 0 && idCols.indexOf(j) < 0) idCols.push(j);
+    });
+    idCols.sort(function (a, b) { return a - b; });
+
+    // Grade-item columns: headers ending in " Points Grade" (the numeric variant).
+    const gradeItems = [];
+    headers.forEach(function (h, idx) {
+      const m = h.match(/^(.*\S)\s+Points\s+Grade$/i);
+      if (m) gradeItems.push({ index: idx, name: m[1].trim(), header: h });
+    });
+
+    return {
+      headers: headers, data: data, idCols: idCols, gradeItems: gradeItems,
+      orgIdx: orgIdx, userIdx: userIdx, firstIdx: firstIdx, lastIdx: lastIdx,
+      emailIdx: emailIdx, eolIdx: eolIdx,
+    };
+  }
+
+  // D2L exports give separate First/Last columns (unlike Canvas's "Last, First").
+  // Returns the same shape as parseCanvasStudent so the matcher + UI are reused.
+  function parseD2LStudent(firstCell, lastCell) {
+    const first = String(firstCell == null ? '' : firstCell).trim();
+    const last = String(lastCell == null ? '' : lastCell).trim();
+    const raw = (first + ' ' + last).trim().replace(/\s+/g, ' ');
+    return { raw: raw, last: last, first: first, tokens: tokenize(first + ' ' + last) };
+  }
+
   function isBlankRow(r) {
     return !r || r.every(function (c) { return String(c == null ? '' : c).trim() === ''; });
   }
@@ -320,6 +373,34 @@
     return out;
   }
 
+  // ---------------------------------------------------------------------------
+  // D2L / Brightspace import builder
+  // ---------------------------------------------------------------------------
+  // opts: { d2l, targetName, grades: Map<dataRowIndex,value>, isNew }
+  // Output: identifier columns (verbatim) + "<targetName> Points Grade" +
+  // "End-of-Line Indicator" (= "#" per row). No Points-Possible row — D2L stores
+  // max points on the grade item, not in the file. The grade values are already
+  // scaled by transformScore (same as the Canvas path). For a new item the user
+  // ticks "create new grade item" in D2L's import wizard.
+  function buildD2LImport(opts) {
+    const d2l = opts.d2l;
+    const idCols = d2l.idCols.length ? d2l.idCols : d2l.headers.map(function (_, j) { return j; });
+    const grades = opts.grades || new Map();
+    const name = opts.targetName == null ? '' : String(opts.targetName).trim();
+    const gradeHeader = name + ' Points Grade';
+
+    const out = [];
+    out.push(idCols.map(function (j) { return d2l.headers[j]; }).concat([gradeHeader, 'End-of-Line Indicator']));
+
+    d2l.data.forEach(function (r, ri) {
+      if (isBlankRow(r)) return;
+      const idVals = idCols.map(function (j) { return r[j] == null ? '' : r[j]; });
+      const g = grades.has(ri) ? grades.get(ri) : '';
+      out.push(idVals.concat([g, '#']));
+    });
+    return out;
+  }
+
   return {
     parseCSV: parseCSV,
     toCSV: toCSV,
@@ -331,11 +412,14 @@
     doenetName: doenetName,
     detectDoenet: detectDoenet,
     detectCanvas: detectCanvas,
+    detectD2L: detectD2L,
+    parseD2LStudent: parseD2LStudent,
     isBlankRow: isBlankRow,
     similarityHelpers: { tokenSetsEqual: tokenSetsEqual, sharedTokenCount: sharedTokenCount },
     autoMatch: autoMatch,
     transformScore: transformScore,
     buildCanvasImport: buildCanvasImport,
+    buildD2LImport: buildD2LImport,
     HIGH: HIGH,
     LIKELY: LIKELY,
   };

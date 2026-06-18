@@ -102,15 +102,20 @@
 <div id="a11y-status" class="visually-hidden" aria-live="polite"></div>
 <div class="wrap">
   <header class="page">
-    <h1>Doenet → Canvas Grade Converter</h1>
-    <p>Upload a Doenet activity export and a Canvas gradebook export. Get back a CSV you can import straight into Canvas.</p>
+    <h1 id="page-title">Doenet → Canvas Grade Converter</h1>
+    <p id="page-intro">Upload a Doenet activity export and a Canvas gradebook export. Get back a CSV you can import straight into Canvas.</p>
     <span class="privacy">🔒 Everything runs in your browser — your files never leave this device.</span>
   </header>
 
   <!-- Step 1: uploads -->
   <section class="card">
     <h2><span class="step-num">1</span>Upload your two files</h2>
-    <p class="hint">Upload the CSV exports from Doenet and Canvas. If you opened them in Excel, save back to CSV first.</p>
+    <p class="hint" id="upload-hint">Upload the CSV exports from Doenet and Canvas. If you opened them in Excel, save back to CSV first.</p>
+    <p class="hint" style="margin-bottom:8px"><strong>Which gradebook are you importing into?</strong></p>
+    <div class="radio-row" id="lms-toggle" style="margin-bottom:16px">
+      <label><input type="radio" name="lms" value="canvas" checked /> Canvas</label>
+      <label><input type="radio" name="lms" value="d2l" /> D2L / Brightspace</label>
+    </div>
     <div class="uploads">
       <div>
         <div class="drop" id="drop-doenet" tabindex="0" role="button" aria-label="Upload Doenet file">
@@ -121,9 +126,9 @@
         <div class="err hidden" id="err-doenet" role="alert"></div>
       </div>
       <div>
-        <div class="drop" id="drop-canvas" tabindex="0" role="button" aria-label="Upload Canvas file">
-          <div class="big">🎓 Canvas gradebook export</div>
-          <div class="sub">Downloaded from your Canvas course</div>
+        <div class="drop" id="drop-canvas" tabindex="0" role="button" aria-label="Upload gradebook file">
+          <div class="big" id="drop-target-title">🎓 Canvas gradebook export</div>
+          <div class="sub" id="drop-target-sub">Downloaded from your Canvas course</div>
         </div>
         <input type="file" id="file-canvas" accept=".csv,text/csv" />
         <div class="err hidden" id="err-canvas" role="alert"></div>
@@ -144,19 +149,19 @@
 
   <!-- Step 3: target + scaling -->
   <section class="card hidden" id="card-target">
-    <h2><span class="step-num">3</span>Choose the Canvas column &amp; grade handling</h2>
+    <h2><span class="step-num">3</span>Choose the target column &amp; grade handling</h2>
 
-    <p class="hint" style="margin-bottom:8px"><strong>Which Canvas column should receive the grades?</strong></p>
+    <p class="hint" style="margin-bottom:8px"><strong id="target-q">Which Canvas column should receive the grades?</strong></p>
     <div class="radio-row">
-      <label><input type="radio" name="target-mode" value="new" checked /> Create a new assignment</label>
-      <label><input type="radio" name="target-mode" value="existing" /> Fill an existing assignment</label>
+      <label><input type="radio" name="target-mode" value="new" checked /> <span id="target-new-label">Create a new assignment</span></label>
+      <label><input type="radio" name="target-mode" value="existing" /> <span id="target-existing-label">Fill an existing assignment</span></label>
     </div>
     <div class="inline-fields" id="target-new">
-      <div><label class="fld" for="new-name">New assignment name</label><input type="text" id="new-name" /></div>
+      <div><label class="fld" for="new-name" id="new-name-label">New assignment name</label><input type="text" id="new-name" /></div>
       <div><label class="fld" for="new-points">Points possible</label><input type="number" id="new-points" value="100" min="0" step="any" /></div>
     </div>
     <div class="inline-fields hidden" id="target-existing">
-      <div><label class="fld" for="existing-sel">Existing assignment</label><select id="existing-sel"></select></div>
+      <div><label class="fld" for="existing-sel" id="existing-sel-label">Existing assignment</label><select id="existing-sel"></select></div>
       <div><label class="fld" for="existing-points">Points possible</label><input type="text" id="existing-points" readonly /></div>
     </div>
 
@@ -187,14 +192,14 @@
 
   <!-- Step 5: download -->
   <section class="card hidden" id="card-download">
-    <h2><span class="step-num">5</span>Download your Canvas import file</h2>
-    <p class="hint">Preview of the file (first rows). Blank grades mean "leave unchanged" in Canvas.</p>
+    <h2><span class="step-num">5</span>Download your import file</h2>
+    <p class="hint" id="download-hint">Preview of the file (first rows). Blank grades mean "leave unchanged" in Canvas.</p>
     <div class="tbl-scroll" style="max-height:300px"><table id="preview-table"></table></div>
     <div style="margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap">
       <button class="btn" id="download-btn" disabled>⬇ Download Canvas import CSV</button>
       <span class="hint" id="download-name" style="margin:0"></span>
     </div>
-    <div class="warn" style="margin-top:14px">
+    <div class="warn" style="margin-top:14px" id="import-note">
       <strong>Next:</strong> In Canvas, open the Gradebook → <em>Import</em> (or the assignment's gear → <em>Re-Upload Scores</em>),
       choose this file, and review the preview before saving. Canvas matches students by the hidden <code>ID</code> column.
     </div>
@@ -213,11 +218,76 @@
 
   var state = {
     doenet: null,   // { detect, mapping, students: [{display, tokens, score}] }
-    canvas: null,   // { detect, students: [parseCanvasStudent] }
-    assign: [],     // per doenet student -> canvas data-row index or null
+    target: null,   // { detect, students: [{raw, tokens, ...}] } — Canvas or D2L
+    lms: 'canvas',  // 'canvas' | 'd2l'
+    assign: [],     // per doenet student -> target data-row index or null
     confidence: [], // per doenet student -> 'high'|'likely'|'none'|'manual'
     lastOutput: null,
   };
+
+  // ---- LMS adapters: the only place that differs between Canvas and D2L ------
+  // Each adapter knows how to detect its export, validate it, build the per-row
+  // students for matching, list existing target columns, and build the import.
+  var ADAPTERS = {
+    canvas: {
+      name: 'Canvas',
+      itemNoun: 'assignment',
+      dropTitle: '🎓 Canvas gradebook export',
+      dropSub: 'Downloaded from your Canvas course',
+      uploadHint: 'Upload the CSV exports from Doenet and Canvas. If you opened them in Excel, save back to CSV first.',
+      targetQ: 'Which Canvas column should receive the grades?',
+      newModeLabel: 'Create a new assignment',
+      existingModeLabel: 'Fill an existing assignment',
+      newNameLabel: 'New assignment name',
+      existingSelLabel: 'Existing assignment',
+      downloadHint: 'Preview of the file (first rows). Blank grades mean "leave unchanged" in Canvas.',
+      importNote: '<strong>Next:</strong> In Canvas, open the Gradebook → <em>Import</em> (or the assignment\'s gear → <em>Re-Upload Scores</em>), ' +
+        'choose this file, and review the preview before saving. Canvas matches students by the hidden <code>ID</code> column.',
+      pointsFromFile: true, // existing-points comes from the file's Points Possible row
+      detect: function (rows) { return GC.detectCanvas(rows); },
+      valid: function (d, rows) { return rows.length && d.idIdx >= 0; },
+      invalidMsg: "Couldn't find the 'ID' column. Please upload a Canvas gradebook export (Grades → Export).",
+      students: function (d) { return d.data.map(function (r) { return GC.parseCanvasStudent(r[d.studentIdx]); }); },
+      count: function (d) { return d.data.filter(function (r) { return !GC.isBlankRow(r); }).length; },
+      existingTargets: function (d) {
+        return d.assignments.map(function (a) { return { label: a.header, header: a.header, name: a.name, points: a.pointsPossible }; });
+      },
+      build: function (o) {
+        return GC.buildCanvasImport({ canvas: o.detect, targetHeader: o.header, targetPointsPossible: o.points, grades: o.grades, isNew: o.isNew });
+      },
+    },
+    d2l: {
+      name: 'D2L',
+      itemNoun: 'grade item',
+      dropTitle: '🟧 D2L grade export',
+      dropSub: 'Brightspace → Grades → Export (include First Name, Last Name, and Username or Org Defined ID)',
+      uploadHint: 'Upload the CSV exports from Doenet and D2L/Brightspace. If you opened them in Excel, save back to CSV first.',
+      targetQ: 'Which D2L grade item should receive the grades?',
+      newModeLabel: 'Create a new grade item',
+      existingModeLabel: 'Fill an existing grade item',
+      newNameLabel: 'New grade item name',
+      existingSelLabel: 'Existing grade item',
+      downloadHint: 'Preview of the file (first rows). Blank grades mean "leave unchanged" in D2L.',
+      importNote: '<strong>Next:</strong> In D2L/Brightspace, open <em>Grades → Import</em>, choose this file, and review the preview before saving. ' +
+        'D2L matches students by the <code>OrgDefinedId</code> / <code>Username</code> columns. ' +
+        'If you created a new grade item, tick <em>“Create new grade item when an unrecognized item is referenced”</em> and set its <strong>max points to match the points possible above</strong>.',
+      pointsFromFile: false, // D2L exports carry no max points — the user enters it
+      detect: function (rows) { return GC.detectD2L(rows); },
+      valid: function (d, rows) {
+        return rows.length && (d.orgIdx >= 0 || d.userIdx >= 0) && d.firstIdx >= 0 && d.lastIdx >= 0;
+      },
+      invalidMsg: "Couldn't read this as a D2L export. Re-export from Brightspace (Grades → Export) and make sure it includes First Name, Last Name, and Username or Org Defined ID.",
+      students: function (d) { return d.data.map(function (r) { return GC.parseD2LStudent(r[d.firstIdx], r[d.lastIdx]); }); },
+      count: function (d) { return d.data.filter(function (r) { return !GC.isBlankRow(r); }).length; },
+      existingTargets: function (d) {
+        return d.gradeItems.map(function (g) { return { label: g.name, header: g.name, name: g.name, points: '' }; });
+      },
+      build: function (o) {
+        return GC.buildD2LImport({ d2l: o.detect, targetName: o.name, grades: o.grades, isNew: o.isNew });
+      },
+    },
+  };
+  function adapter() { return ADAPTERS[state.lms]; }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -288,17 +358,15 @@
     }).catch(function (e) { showErr('err-doenet', e.message || 'Could not read this file.'); });
   }
 
-  // ---- handle Canvas upload -------------------------------------------------
-  function onCanvas(file) {
+  // ---- handle target gradebook upload (Canvas or D2L) -----------------------
+  function onTarget(file) {
     hideErr('err-canvas');
+    var ad = adapter();
     readFile(file).then(function (rows) {
-      var c = GC.detectCanvas(rows);
-      if (!rows.length || c.idIdx < 0) {
-        showErr('err-canvas', "Couldn't find the 'ID' column. Please upload a Canvas gradebook export (Grades → Export).");
-        return;
-      }
-      state.canvas = { detect: c, students: c.data.map(function (r) { return GC.parseCanvasStudent(r[c.studentIdx]); }) };
-      markLoaded('drop-canvas', file.name, c.data.filter(function (r) { return !GC.isBlankRow(r); }).length, 'students');
+      var d = ad.detect(rows);
+      if (!ad.valid(d, rows)) { showErr('err-canvas', ad.invalidMsg); return; }
+      state.target = { detect: d, students: ad.students(d) };
+      markLoaded('drop-canvas', file.name, ad.count(d), 'students');
       buildTargetUI();
       maybeReady();
     }).catch(function (e) { showErr('err-canvas', e.message || 'Could not read this file.'); });
@@ -339,24 +407,29 @@
 
   // ---- Step 3: target + scaling UI -----------------------------------------
   function buildTargetUI() {
-    var c = state.canvas.detect;
+    var ad = adapter();
+    var targets = ad.existingTargets(state.target.detect);
     $('new-name').value = (state.doenet && state.doenet.detect.scoreHeader) || 'Doenet Activity';
-    $('existing-sel').innerHTML = c.assignments.map(function (a, i) {
-      return '<option value="' + i + '">' + esc(a.header) + '</option>';
+    $('existing-sel').innerHTML = targets.map(function (t, i) {
+      return '<option value="' + i + '">' + esc(t.label) + '</option>';
     }).join('');
+    // D2L exports carry no max points, so the existing-item points field is
+    // user-editable; Canvas fills it (read-only) from the Points Possible row.
+    $('existing-points').readOnly = ad.pointsFromFile;
     syncExistingPoints();
 
-    // If the Canvas export has no assignment columns to fill, force "new".
+    // If the export has no existing target columns to fill, force "new".
     var existingRadio = document.querySelector('input[name=target-mode][value=existing]');
-    if (!c.assignments.length) {
+    if (!targets.length) {
       existingRadio.disabled = true;
-      existingRadio.parentNode.title = 'This Canvas file has no assignment columns to fill.';
+      existingRadio.parentNode.title = 'This file has no existing columns to fill.';
       var newRadio = document.querySelector('input[name=target-mode][value=new]');
       newRadio.checked = true;
       $('target-existing').classList.add('hidden');
       $('target-new').classList.remove('hidden');
     } else {
       existingRadio.disabled = false;
+      existingRadio.parentNode.title = '';
     }
 
     document.querySelectorAll('input[name=target-mode]').forEach(function (el) {
@@ -376,14 +449,16 @@
     $('card-target').classList.remove('hidden');
   }
   function syncExistingPoints() {
-    var c = state.canvas.detect;
-    var a = c.assignments[parseInt($('existing-sel').value, 10)];
-    $('existing-points').value = a ? a.pointsPossible : '';
+    // For D2L the points field is user-entered — don't clobber it on selection.
+    if (!adapter().pointsFromFile) return;
+    var targets = adapter().existingTargets(state.target.detect);
+    var t = targets[parseInt($('existing-sel').value, 10)];
+    $('existing-points').value = t ? t.points : '';
   }
 
   // ---- when both files ready: auto-match -----------------------------------
   function maybeReady() {
-    if (!state.doenet || !state.canvas) return;
+    if (!state.doenet || !state.target) return;
     if (!state.doenet.students) rebuildDoenetStudents();
     runAutoMatch();
     $('card-match').classList.remove('hidden');
@@ -392,8 +467,8 @@
   }
 
   function runAutoMatch() {
-    if (!state.doenet || !state.canvas || !state.doenet.students) return;
-    var m = GC.autoMatch(state.doenet.students, state.canvas.students);
+    if (!state.doenet || !state.target || !state.doenet.students) return;
+    var m = GC.autoMatch(state.doenet.students, state.target.students);
     state.assign = m.map(function (x) { return x.canvasIdx; });
     state.confidence = m.map(function (x) { return x.confidence; });
   }
@@ -401,20 +476,21 @@
   // ---- target/scale resolution ---------------------------------------------
   function currentMode() { return document.querySelector('input[name=target-mode]:checked').value; }
   function currentTarget() {
-    var c = state.canvas.detect;
-    var mode = currentMode();
-    if (mode === 'existing') {
-      var a = c.assignments[parseInt($('existing-sel').value, 10)] || {};
-      return { header: a.header || '', points: a.pointsPossible || '' };
+    var ad = adapter();
+    if (currentMode() === 'existing') {
+      var t = ad.existingTargets(state.target.detect)[parseInt($('existing-sel').value, 10)] || {};
+      var pts = ad.pointsFromFile ? (t.points || '') : ($('existing-points').value || '0');
+      return { header: t.header || '', name: t.name || '', points: pts };
     }
-    return { header: $('new-name').value.trim() || 'Doenet Activity', points: $('new-points').value || '0' };
+    var nm = $('new-name').value.trim() || 'Doenet Activity';
+    return { header: nm, name: nm, points: $('new-points').value || '0' };
   }
   function currentScaleMode() { return document.querySelector('input[name=scale-mode]:checked').value; }
 
   // ---- recompute everything -------------------------------------------------
   // Computes the grade view ONCE, then renders the table + summary/preview from it.
   function recompute() {
-    if (!state.doenet || !state.doenet.students || !state.canvas) return;
+    if (!state.doenet || !state.doenet.students || !state.target) return;
     var target = currentTarget(), scaleMode = currentScaleMode();
     var gm = buildGradesMap(target, scaleMode);
     renderMatchTable(target, scaleMode, gm);
@@ -424,13 +500,13 @@
   // Cheap path for inputs that only affect the output (assignment name) and not
   // the match table.
   function recomputeOutputOnly() {
-    if (!state.doenet || !state.doenet.students || !state.canvas) return;
+    if (!state.doenet || !state.doenet.students || !state.target) return;
     var target = currentTarget(), scaleMode = currentScaleMode();
     renderSummaryAndPreview(target, scaleMode, buildGradesMap(target, scaleMode));
   }
 
   function renderMatchTable(target, scaleMode, gm) {
-    var ds = state.doenet.students, cs = state.canvas.students;
+    var ds = state.doenet.students, cs = state.target.students;
     var canvasOpts = cs.map(function (s, idx) {
       return s.raw ? { idx: idx, label: s.raw } : null;
     }).filter(Boolean);
@@ -495,7 +571,7 @@
       if (ci == null) return;
       if (seen[ci] != null) {
         collisions.push({
-          canvas: state.canvas.students[ci].raw,
+          canvas: state.target.students[ci].raw,
           a: state.doenet.students[seen[ci]].display || '(no name)',
           b: s.display || '(no name)',
         });
@@ -510,16 +586,17 @@
   }
 
   function renderSummaryAndPreview(target, scaleMode, gm) {
-    var ds = state.doenet.students, cs = state.canvas.students;
+    var ds = state.doenet.students, cs = state.target.students;
+    var ad = adapter(), lms = ad.name, noun = ad.itemNoun;
     var matched = state.assign.filter(function (x) { return x != null; }).length;
     var likely = state.confidence.filter(function (x) { return x === 'likely'; }).length;
-    var canvasTotal = cs.filter(function (s) { return s.raw; }).length;
+    var targetTotal = cs.filter(function (s) { return s.raw; }).length;
     var gradeCount = Array.from(gm.grades.values()).filter(function (g) { return g !== ''; }).length;
 
     $('summary').innerHTML =
       stat(matched + ' / ' + ds.length, 'Doenet students matched') +
-      stat(String(gradeCount), 'Canvas students will get a grade') +
-      stat(String(Math.max(0, canvasTotal - gradeCount)), 'Canvas students left unchanged') +
+      stat(String(gradeCount), lms + ' students will get a grade') +
+      stat(String(Math.max(0, targetTotal - gradeCount)), lms + ' students left unchanged') +
       (likely ? stat(String(likely), 'best-guess — please confirm') : '');
 
     // Build the warning list; some warnings block the download.
@@ -528,16 +605,16 @@
     if (gm.collisions.length) {
       warns.push('⚠ ' + gm.collisions.map(function (c) {
         return esc(c.a) + ' and ' + esc(c.b) + ' both map to “' + esc(c.canvas) + '”';
-      }).join('; ') + '. The first one’s grade is used — fix a dropdown so each Doenet student maps to a different Canvas student.');
+      }).join('; ') + '. The first one’s grade is used — fix a dropdown so each Doenet student maps to a different ' + lms + ' student.');
     }
     if ((currentMode() === 'new' || scaleMode === 'percent') && !(ppNum > 0)) {
       warns.push('⛔ Enter a “Points possible” greater than 0' +
-        (scaleMode === 'percent' ? ' — otherwise every percentage scales to 0.' : ' for the new assignment.') +
-        (currentMode() === 'existing' ? ' (This Canvas assignment has no points set; set it in Canvas or switch to “Copy the number as-is”.)' : ''));
+        (scaleMode === 'percent' ? ' — otherwise every percentage scales to 0.' : ' for the new ' + noun + '.') +
+        (currentMode() === 'existing' ? ' (This ' + noun + ' has no points set; set it in ' + lms + ' or switch to “Copy the number as-is”.)' : ''));
       blocking = true;
     }
     if (!String(target.header).trim()) {
-      warns.push('⛔ No Canvas assignment selected to receive the grades.');
+      warns.push('⛔ No ' + lms + ' ' + noun + ' selected to receive the grades.');
       blocking = true;
     }
     if (gm.unparsed.length) {
@@ -566,9 +643,9 @@
     }
 
     // Output preview + download.
-    var outRows = GC.buildCanvasImport({
-      canvas: state.canvas.detect, targetHeader: target.header,
-      targetPointsPossible: target.points, grades: gm.grades, isNew: currentMode() === 'new',
+    var outRows = adapter().build({
+      detect: state.target.detect, header: target.header, name: target.name,
+      points: target.points, grades: gm.grades, isNew: currentMode() === 'new',
     });
     state.lastOutput = outRows;
     renderPreview(outRows);
@@ -600,7 +677,7 @@
   function downloadName(header) {
     var safe = String(header || 'grades').replace(/[^a-z0-9 _-]/gi, '').trim() || 'grades';
     var d = new Date().toISOString().slice(0, 10);
-    return 'Canvas Import - ' + safe + ' - ' + d + '.csv';
+    return adapter().name + ' Import - ' + safe + ' - ' + d + '.csv';
   }
   function downloadCSV(text, filename) {
     var blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8;' });
@@ -611,9 +688,49 @@
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
+  // ---- LMS toggle -----------------------------------------------------------
+  // Apply an adapter's labels to the page (heading is shared; only LMS-specific
+  // wording changes). Called on init and whenever the toggle flips.
+  function applyLms() {
+    var ad = adapter();
+    $('page-title').textContent = 'Doenet → ' + ad.name + ' Grade Converter';
+    $('page-intro').textContent = 'Upload a Doenet activity export and a ' + ad.name +
+      ' gradebook export. Get back a CSV you can import straight into ' + ad.name + '.';
+    $('upload-hint').textContent = ad.uploadHint;
+    $('drop-target-title').textContent = ad.dropTitle;
+    $('drop-target-sub').textContent = ad.dropSub;
+    $('target-q').textContent = ad.targetQ;
+    $('target-new-label').textContent = ad.newModeLabel;
+    $('target-existing-label').textContent = ad.existingModeLabel;
+    $('new-name-label').textContent = ad.newNameLabel;
+    $('existing-sel-label').textContent = ad.existingSelLabel;
+    $('download-hint').textContent = ad.downloadHint;
+    $('import-note').innerHTML = ad.importNote;
+  }
+
+  // Switching gradebooks invalidates whatever was uploaded in the target box, so
+  // reset it (and the downstream cards) to the initial state.
+  function onLmsChange() {
+    state.lms = document.querySelector('input[name=lms]:checked').value;
+    state.target = null;
+    hideErr('err-canvas');
+    var drop = $('drop-canvas');
+    drop.classList.remove('loaded');
+    drop.innerHTML = '<div class="big" id="drop-target-title"></div><div class="sub" id="drop-target-sub"></div>';
+    $('file-canvas').value = '';
+    $('existing-points').readOnly = true;
+    ['card-target', 'card-match', 'card-download'].forEach(function (id) { $(id).classList.add('hidden'); });
+    // Nothing to download until the new gradebook is uploaded.
+    var btn = $('download-btn'); btn.disabled = true; btn.onclick = null;
+    $('download-name').textContent = '';
+    applyLms();
+  }
+
   // ---- init -----------------------------------------------------------------
   wireDrop('drop-doenet', 'file-doenet', onDoenet);
-  wireDrop('drop-canvas', 'file-canvas', onCanvas);
+  wireDrop('drop-canvas', 'file-canvas', onTarget);
+  document.querySelectorAll('input[name=lms]').forEach(function (el) { el.onchange = onLmsChange; });
+  applyLms();
 })();
 </script>
 </body>

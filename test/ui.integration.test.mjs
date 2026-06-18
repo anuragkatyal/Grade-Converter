@@ -26,6 +26,7 @@ html = html.replace('<script src="grade-converter.js"></script>', '<script>' + g
 
 const doenetText = readFileSync(join(root, 'From Doenet.csv'), 'utf8');
 const canvasText = readFileSync(join(root, 'From Canvas.csv'), 'utf8');
+const d2lText = readFileSync(join(root, 'From D2L.csv'), 'utf8');
 
 const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true });
 const win = dom.window;
@@ -131,6 +132,48 @@ const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
     /both map to/.test(doc.getElementById('collision-warn').innerHTML));
   ok('losing row is flagged Overwritten',
     doc.getElementById('match-table').innerHTML.indexOf('Overwritten') >= 0);
+
+  // --- D2L path: flip the toggle, drop the D2L export, inspect the import -----
+  console.log('\nUI integration — D2L path');
+  const d2lRadio = doc.querySelector('input[name=lms][value=d2l]');
+  d2lRadio.checked = true;
+  d2lRadio.dispatchEvent(new win.Event('change'));
+
+  ok('toggle re-labels the page for D2L',
+    doc.getElementById('page-title').textContent.indexOf('D2L') >= 0);
+  ok('downstream cards hidden until the D2L file is uploaded',
+    doc.getElementById('card-download').classList.contains('hidden'));
+
+  // Doenet file is still loaded; only the target box was reset. Drop the D2L file.
+  dropFile('drop-canvas', 'From D2L.csv', d2lText);
+  tries = 0;
+  while (doc.getElementById('download-btn').disabled && tries++ < 50) await wait(20);
+
+  // Use percent -> 100 points for a deterministic scaling.
+  doc.querySelector('input[name=scale-mode][value=percent]').checked = true;
+  doc.querySelector('input[name=scale-mode][value=percent]').dispatchEvent(new win.Event('change'));
+  doc.getElementById('new-points').value = '100';
+  doc.getElementById('new-points').dispatchEvent(new win.Event('input'));
+
+  doc.getElementById('download-btn').click();
+  const dOut = GC.parseCSV(captured._text);
+  ok('D2L header row correct',
+    JSON.stringify(dOut[0]) === JSON.stringify(['OrgDefinedId', 'Username', 'Last Name', 'First Name', 'Sample Activity 1 Points Grade', 'End-of-Line Indicator']),
+    JSON.stringify(dOut[0]));
+  ok('no Points Possible row (first data row is a student)', dOut[1][0] === '3000001', JSON.stringify(dOut[1]));
+  ok('every data row carries the "#" End-of-Line marker',
+    dOut.slice(1).every((r) => r[r.length - 1] === '#'));
+  ok('identifier columns preserved verbatim (incl. #username)',
+    dOut[1][0] === '3000001' && dOut[1][1] === '#aapple', JSON.stringify(dOut[1].slice(0, 2)));
+
+  function d2lGrade(org) {
+    const r = dOut.find((row) => row[0] === org);
+    return r ? r[r.length - 2] : undefined; // last col is the End-of-Line "#"
+  }
+  ok('Alice Apple (3000001) -> 100', d2lGrade('3000001') === '100', d2lGrade('3000001'));
+  ok('unmatched Test Student (3000009) -> blank', d2lGrade('3000009') === '', JSON.stringify(d2lGrade('3000009')));
+  ok('import note mentions D2L import',
+    /Grades\s*→\s*Import/.test(doc.getElementById('import-note').innerHTML));
 
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed ? 1 : 0);
