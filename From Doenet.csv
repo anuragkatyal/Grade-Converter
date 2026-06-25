@@ -1,9 +1,9 @@
 "First name","Last name","Student ID","Sample Activity 1"
 "Alice","Apple","D0001",100
-"Bob ","Brooks","D0002",90
-"Carlos","Cruz","D0003",80
-"Dana","Diaz","D0004",40
-"","ghostuser","D0005",10
+"Bob ","Brooks","D0002", 90
+"Carlos","Cruz","D0003",100
+"Dana","Diaz","D0004",80
+"","ghostuser","D0005",100
 "Ivy","Instructor","D0006",0
 "erin","evans","D0007",65
 "Frank","Flores","D0008",14
