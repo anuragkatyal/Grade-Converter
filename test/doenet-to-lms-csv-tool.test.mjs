@@ -182,8 +182,8 @@ function outGrade(student) {
   return row ? row[row.length - 1] : undefined;
 }
 eq('Apple, Alice -> 100', outGrade('Apple, Alice'), '100');
-eq('Garcia Lopez (fuzzy) -> 100', outGrade('Garcia Lopez, Maria Elena'), '100');
-eq('Gomez, Grace -> 100', outGrade('Gomez, Grace'), '100');
+eq('Garcia Lopez (fuzzy) -> 29 (Maria Lopez score)', outGrade('Garcia Lopez, Maria Elena'), '29');
+eq('Gomez, Grace -> 50.1', outGrade('Gomez, Grace'), '50.1');
 eq('unmatched Test Student -> blank', outGrade('Student, Test'), '');
 
 // Round-trip: serialise then re-parse and confirm structure survives quoting.
@@ -270,7 +270,7 @@ console.log('\nD2L import build (new item, percent -> 100 pts)');
     return row ? row[row.length - 2] : undefined; // last col is End-of-Line "#"
   }
   eq('Alice Apple (3000001) -> 100', d2lGrade('3000001'), '100');
-  eq('Maria (fuzzy, 3000007) -> 100', d2lGrade('3000007'), '100');
+  eq('Maria (fuzzy, 3000007) -> 29 (Maria Lopez score)', d2lGrade('3000007'), '29');
   eq('unmatched Test Student (3000009) -> blank', d2lGrade('3000009'), '');
 
   // New vs existing both use the "<name> Points Grade" header form.

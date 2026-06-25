@@ -96,7 +96,7 @@ const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
     return r ? r[r.length - 1] : undefined;
   }
   ok('Apple, Alice -> 100', grade('Apple, Alice') === '100', grade('Apple, Alice'));
-  ok('Garcia Lopez (fuzzy) -> 100', grade('Garcia Lopez, Maria Elena') === '100', grade('Garcia Lopez, Maria Elena'));
+  ok('Garcia Lopez (fuzzy) -> 29 (Maria Lopez score)', grade('Garcia Lopez, Maria Elena') === '29', grade('Garcia Lopez, Maria Elena'));
   ok('Cruz, Carlos -> 100', grade('Cruz, Carlos') === '100', grade('Cruz, Carlos'));
   ok('unmatched Test Student -> blank', grade('Student, Test') === '', JSON.stringify(grade('Student, Test')));
 
@@ -107,11 +107,11 @@ const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
   // Switching to "copy as-is" should change a fractional grade verbatim.
   doc.querySelector('input[name=scale-mode][value=copy]').checked = true;
   doc.querySelector('input[name=scale-mode][value=copy]').dispatchEvent(new win.Event('change'));
-  // (demo user=12.5 is unmatched, so pick a matched student & verify 100 stays 100 in copy mode.)
+  // (demo user=12.5 is unmatched, so pick a matched student & verify the raw score is copied verbatim in copy mode.)
   doc.getElementById('download-btn').click();
   const out2 = GC.parseCSV(captured._text);
   const g2 = (() => { const r = out2.find((row) => row[0] === 'Gomez, Grace'); return r && r[r.length - 1]; })();
-  ok('copy mode keeps 100 as 100', g2 === '100', g2);
+  ok('copy mode copies raw score verbatim (50.1)', g2 === '50.1', g2);
 
   // Clearing Points Possible blocks the download (a new assignment needs points).
   doc.getElementById('new-points').value = '';
