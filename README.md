@@ -1,6 +1,6 @@
-# Grade-Converter
+# Doenet-to-LMS-CSV-Tool
 
-[![CI](https://github.com/anuragkatyal/Grade-Converter/actions/workflows/ci.yml/badge.svg)](https://github.com/anuragkatyal/Grade-Converter/actions/workflows/ci.yml)
+[![CI](https://github.com/anuragkatyal/Doenet-to-LMS-CSV-Tool/actions/workflows/ci.yml/badge.svg)](https://github.com/anuragkatyal/Doenet-to-LMS-CSV-Tool/actions/workflows/ci.yml)
 
 A small, **100% client-side** web tool that transfers grades from a
 [Doenet](https://beta.doenet.org) activity export into a CSV you can import
@@ -11,7 +11,7 @@ you download an import-ready CSV. **Nothing is uploaded to any server** — all
 parsing and matching happens in your browser, so student data never leaves your
 machine.
 
-➡️ **Live tool:** https://anuragkatyal.github.io/Grade-Converter/
+➡️ **Live tool:** https://anuragkatyal.github.io/Doenet-to-LMS-CSV-Tool/
 
 ---
 
@@ -114,11 +114,11 @@ it — keep student data off the public site.
 
 This repo is plain static files — no build step.
 
-1. Push to GitHub (already at `anuragkatyal/Grade-Converter`).
+1. Push to GitHub (already at `anuragkatyal/Doenet-to-LMS-CSV-Tool`).
 2. **Settings → Pages → Build and deployment → Source:** *Deploy from a branch*.
 3. Branch: `main`, folder: `/ (root)`. Save.
 4. After a minute the tool is live at
-   `https://anuragkatyal.github.io/Grade-Converter/`.
+   `https://anuragkatyal.github.io/Doenet-to-LMS-CSV-Tool/`.
 
 There are **no external dependencies** — no CDN scripts and no build step — so
 the tool works fully offline once the page has loaded.
@@ -130,9 +130,9 @@ the tool works fully offline once the page has loaded.
 | File | Purpose |
 |------|---------|
 | `index.html` | The whole UI (HTML + CSS + glue JS), including the Canvas/D2L toggle and per-LMS adapters. |
-| `grade-converter.js` | Dependency-free core logic — CSV parse/serialise, name matching, score scaling, and the Canvas **and** D2L import builders. Runs in the browser **and** Node. |
+| `doenet-to-lms-csv-tool.js` | Dependency-free core logic — CSV parse/serialise, name matching, score scaling, and the Canvas **and** D2L import builders. Runs in the browser **and** Node. |
 | `From Doenet.csv` / `From Canvas.csv` / `From D2L.csv` | Synthetic sample exports (fabricated data) used by the tests. |
-| `test/grade-converter.test.mjs` | Unit tests for the core logic, run against the real sample files. |
+| `test/doenet-to-lms-csv-tool.test.mjs` | Unit tests for the core logic, run against the real sample files. |
 | `test/ui.integration.test.mjs` | Loads `index.html` in jsdom, simulates the uploads for both the Canvas and D2L paths, and checks the downloaded CSV. |
 
 ## Running the tests
@@ -142,7 +142,7 @@ npm install      # dev-only: jsdom, for the integration test
 npm test
 ```
 
-The unit tests need no dependencies (`node test/grade-converter.test.mjs`); only
+The unit tests need no dependencies (`node test/doenet-to-lms-csv-tool.test.mjs`); only
 the DOM integration test requires `jsdom`.
 
 ## License
