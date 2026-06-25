@@ -1,18 +1,18 @@
 {
-  "name": "grade-converter",
+  "name": "doenet-to-lms-csv-tool",
   "version": "1.0.0",
   "description": "Client-side tool to transfer Doenet activity grades into a Canvas-importable CSV",
-  "main": "grade-converter.js",
+  "main": "doenet-to-lms-csv-tool.js",
   "type": "commonjs",
   "scripts": {
-    "test": "node test/grade-converter.test.mjs && node test/ui.integration.test.mjs"
+    "test": "node test/doenet-to-lms-csv-tool.test.mjs && node test/ui.integration.test.mjs"
   },
   "devDependencies": {
     "jsdom": "^24.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anuragkatyal/Grade-Converter.git"
+    "url": "git+https://github.com/anuragkatyal/Doenet-to-LMS-CSV-Tool.git"
   },
   "license": "MIT",
   "private": true

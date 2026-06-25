@@ -18,11 +18,11 @@ function ok(name, cond, extra) {
   else { failed++; console.log('  ✗ ' + name + (extra ? '  -> ' + extra : '')); }
 }
 
-// Build a self-contained HTML: inline grade-converter.js, drop the CDN <script>.
+// Build a self-contained HTML: inline doenet-to-lms-csv-tool.js, drop the CDN <script>.
 let html = readFileSync(join(root, 'index.html'), 'utf8');
-const gcSrc = readFileSync(join(root, 'grade-converter.js'), 'utf8');
+const gcSrc = readFileSync(join(root, 'doenet-to-lms-csv-tool.js'), 'utf8');
 html = html.replace(/<script src="https:\/\/cdn[^"]*"><\/script>/, '');
-html = html.replace('<script src="grade-converter.js"></script>', '<script>' + gcSrc + '</script>');
+html = html.replace('<script src="doenet-to-lms-csv-tool.js"></script>', '<script>' + gcSrc + '</script>');
 
 const doenetText = readFileSync(join(root, 'From Doenet.csv'), 'utf8');
 const canvasText = readFileSync(join(root, 'From Canvas.csv'), 'utf8');

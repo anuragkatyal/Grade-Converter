@@ -1,7 +1,7 @@
 /*
- * Node test harness for grade-converter.js, run against the synthetic sample
+ * Node test harness for doenet-to-lms-csv-tool.js, run against the synthetic sample
  * exports shipped in the repo ("From Doenet.csv" / "From Canvas.csv"). No deps.
- *   run:  node test/grade-converter.test.mjs
+ *   run:  node test/doenet-to-lms-csv-tool.test.mjs
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const GC = require(join(root, 'grade-converter.js'));
+const GC = require(join(root, 'doenet-to-lms-csv-tool.js'));
 
 let passed = 0;
 let failed = 0;

@@ -1,5 +1,5 @@
 /*
- * grade-converter.js — core logic for transferring Doenet grades into a Canvas import file.
+ * doenet-to-lms-csv-tool.js — core logic for transferring Doenet grades into a Canvas import file.
  *
  * Pure, dependency-free, and runnable in both the browser (window.GC) and Node
  * (module.exports) so the same code that powers the page is covered by the test
