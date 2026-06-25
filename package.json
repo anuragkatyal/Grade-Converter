@@ -5,7 +5,7 @@
   "main": "doenet-to-lms-csv-tool.js",
   "type": "commonjs",
   "scripts": {
-    "test": "node test/doenet-to-lms-csv-tool.test.mjs && node test/ui.integration.test.mjs"
+    "test": "node test/doenet-to-lms-csv-tool.test.mjs; u=$?; node test/ui.integration.test.mjs; i=$?; exit $(( u || i ))"
   },
   "devDependencies": {
     "jsdom": "^24.0.0"

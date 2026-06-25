@@ -65,6 +65,16 @@ const doenetStudents = dd.data
 const canvasStudents = cc.data.map((r) => GC.parseCanvasStudent(r[cc.studentIdx]));
 const matches = GC.autoMatch(doenetStudents, canvasStudents);
 
+// Expected grades are DERIVED from the sample file, never hard-coded — so the
+// tests survive edits to the sample scores. doenetStudents[k] aligns with the
+// k-th non-blank Doenet data row, so we can look a student up by display name.
+const doenetRows = dd.data.filter((r) => !GC.isBlankRow(r));
+function expectGrade(doenetDisplay, mode = 'percent', pp = 100) {
+  const k = doenetStudents.findIndex((d) => d.display.toLowerCase() === doenetDisplay.toLowerCase());
+  if (k < 0) throw new Error(`no Doenet student named "${doenetDisplay}" in the sample`);
+  return GC.transformScore(doenetRows[k][dd.scoreIdx], mode, pp);
+}
+
 function canvasNameFor(i) {
   const m = matches[i];
   return m.canvasIdx == null ? null : canvasStudents[m.canvasIdx].raw;
@@ -181,9 +191,9 @@ function outGrade(student) {
   const row = outRows.find((r) => r[0] === student);
   return row ? row[row.length - 1] : undefined;
 }
-eq('Apple, Alice -> 100', outGrade('Apple, Alice'), '100');
-eq('Garcia Lopez (fuzzy) -> 29 (Maria Lopez score)', outGrade('Garcia Lopez, Maria Elena'), '29');
-eq('Gomez, Grace -> 50.1', outGrade('Gomez, Grace'), '50.1');
+eq('Apple, Alice -> Alice Apple score', outGrade('Apple, Alice'), expectGrade('Alice Apple'));
+eq('Garcia Lopez (fuzzy) -> Maria Lopez score', outGrade('Garcia Lopez, Maria Elena'), expectGrade('Maria Lopez'));
+eq('Gomez, Grace -> Grace Gomez score', outGrade('Gomez, Grace'), expectGrade('Grace Gomez'));
 eq('unmatched Test Student -> blank', outGrade('Student, Test'), '');
 
 // Round-trip: serialise then re-parse and confirm structure survives quoting.
@@ -269,8 +279,8 @@ console.log('\nD2L import build (new item, percent -> 100 pts)');
     const row = out.find((r) => r[0] === org);
     return row ? row[row.length - 2] : undefined; // last col is End-of-Line "#"
   }
-  eq('Alice Apple (3000001) -> 100', d2lGrade('3000001'), '100');
-  eq('Maria (fuzzy, 3000007) -> 29 (Maria Lopez score)', d2lGrade('3000007'), '29');
+  eq('Alice Apple (3000001) -> Alice Apple score', d2lGrade('3000001'), expectGrade('Alice Apple'));
+  eq('Maria (fuzzy, 3000007) -> Maria Lopez score', d2lGrade('3000007'), expectGrade('Maria Lopez'));
   eq('unmatched Test Student (3000009) -> blank', d2lGrade('3000009'), '');
 
   // New vs existing both use the "<name> Points Grade" header form.

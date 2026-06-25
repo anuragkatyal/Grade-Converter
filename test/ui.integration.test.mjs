@@ -83,6 +83,18 @@ const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
   ok('download produced a blob', captured && typeof captured._text === 'string');
 
   const GC = win.GC;
+
+  // Expected grades are DERIVED from the sample file, not hard-coded, so these
+  // checks survive edits to the sample scores (percent mode, pointsPossible 100).
+  const dd = GC.detectDoenet(GC.parseCSV(doenetText));
+  const doenetRows = dd.data.filter((r) => !GC.isBlankRow(r));
+  const doenetStudents = doenetRows.map((r) => GC.doenetName(r[dd.firstIdx], r[dd.lastIdx]));
+  function expectGrade(doenetDisplay, mode = 'percent', pp = 100) {
+    const k = doenetStudents.findIndex((d) => d.display.toLowerCase() === doenetDisplay.toLowerCase());
+    if (k < 0) throw new Error(`no Doenet student named "${doenetDisplay}" in the sample`);
+    return GC.transformScore(doenetRows[k][dd.scoreIdx], mode, pp);
+  }
+
   const out = GC.parseCSV(captured._text);
   ok('header row correct',
     JSON.stringify(out[0]) === JSON.stringify(['Student', 'ID', 'SIS Login ID', 'Section', 'Sample Activity 1']),
@@ -95,9 +107,9 @@ const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
     const r = out.find((row) => row[0] === student);
     return r ? r[r.length - 1] : undefined;
   }
-  ok('Apple, Alice -> 100', grade('Apple, Alice') === '100', grade('Apple, Alice'));
-  ok('Garcia Lopez (fuzzy) -> 29 (Maria Lopez score)', grade('Garcia Lopez, Maria Elena') === '29', grade('Garcia Lopez, Maria Elena'));
-  ok('Cruz, Carlos -> 100', grade('Cruz, Carlos') === '100', grade('Cruz, Carlos'));
+  ok('Apple, Alice -> Alice Apple score', grade('Apple, Alice') === expectGrade('Alice Apple'), grade('Apple, Alice'));
+  ok('Garcia Lopez (fuzzy) -> Maria Lopez score', grade('Garcia Lopez, Maria Elena') === expectGrade('Maria Lopez'), grade('Garcia Lopez, Maria Elena'));
+  ok('Cruz, Carlos -> Carlos Cruz score', grade('Cruz, Carlos') === expectGrade('Carlos Cruz'), grade('Cruz, Carlos'));
   ok('unmatched Test Student -> blank', grade('Student, Test') === '', JSON.stringify(grade('Student, Test')));
 
   // Every Canvas student row is present in the output (8 students + test student).
@@ -111,7 +123,7 @@ const wait = (ms) => new Promise((r) => win.setTimeout(r, ms));
   doc.getElementById('download-btn').click();
   const out2 = GC.parseCSV(captured._text);
   const g2 = (() => { const r = out2.find((row) => row[0] === 'Gomez, Grace'); return r && r[r.length - 1]; })();
-  ok('copy mode copies raw score verbatim (50.1)', g2 === '50.1', g2);
+  ok('copy mode copies raw score verbatim', g2 === expectGrade('Grace Gomez', 'copy'), g2);
 
   // Clearing Points Possible blocks the download (a new assignment needs points).
   doc.getElementById('new-points').value = '';
